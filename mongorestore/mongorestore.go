@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"sync"
 	"syscall"
+	"strings"
 )
 
 // MongoRestore is a container for the user-specified options and
@@ -312,6 +313,12 @@ func (restore *MongoRestore) Restore() error {
 			if !ok {
 				break
 			}
+
+			if strings.Contains(ns, "/") {
+				namespaceErrorChan <- nil
+				continue
+			}
+
 			intent := restore.manager.IntentForNamespace(ns)
 			if intent == nil {
 				return fmt.Errorf("no intent for collection in archive: %v", ns)

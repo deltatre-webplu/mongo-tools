@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"io"
+	"gopkg.in/mgo.v2/bson"
+	"strings"
 )
 
 // parser.go implements the parsing of the low-level archive format
@@ -131,21 +133,40 @@ func (parse *Parser) ReadBlock(consumer ParserConsumer) (err error) {
 	if isTerminator {
 		return newParserError("consecutive terminators / headerless blocks are not allowed")
 	}
+	
+	header := NamespaceHeader{}
+	bson.Unmarshal(parse.buf[:parse.length], &header)
+
+	if strings.Contains(header.Collection, "/") {
+		for {
+			term, skipErr := parse.readBSONOrTerminator()
+
+			if skipErr != nil {
+				fmt.Printf("slash collections mmm")
+			}
+
+			if term {
+				return nil
+			}
+		}
+		
+	}
+
 	err = consumer.HeaderBSON(parse.buf[:parse.length])
-	if err != nil {
-		return newParserWrappedError("ParserConsumer.HeaderBSON()", err)
-	}
-	for {
-		isTerminator, err = parse.readBSONOrTerminator()
-		if err != nil { // all errors, including EOF are errors here
-			return newParserWrappedError("ParserConsumer.BodyBSON()", err)
-		}
-		if isTerminator {
-			return nil
-		}
-		err = consumer.BodyBSON(parse.buf[:parse.length])
 		if err != nil {
-			return newParserWrappedError("ParserConsumer.BodyBSON()", err)
+			return newParserWrappedError("ParserConsumer.HeaderBSON()", err)
 		}
-	}
+		for {
+			isTerminator, err = parse.readBSONOrTerminator()
+			if err != nil { // all errors, including EOF are errors here
+				return newParserWrappedError("ParserConsumer.BodyBSON()", err)
+			}
+			if isTerminator {
+				return nil
+			}
+			err = consumer.BodyBSON(parse.buf[:parse.length])
+			if err != nil {
+				return newParserWrappedError("ParserConsumer.BodyBSON()", err)
+			}
+		}
 }

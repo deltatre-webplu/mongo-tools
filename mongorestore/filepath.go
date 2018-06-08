@@ -315,11 +315,16 @@ func (restore *MongoRestore) CreateIntentsForDB(db string, filterCollection stri
 	}
 	usesMetadataFiles := hasMetadataFiles(entries)
 	for _, entry := range entries {
+		if strings.Contains(entry.Name(), "/") {
+			continue
+		}			
+
 		if entry.IsDir() {
 			log.Logf(log.Always, `don't know what to do with subdirectory "%v", skipping...`,
 				filepath.Join(dir.Name(), entry.Name()))
 		} else {
 			collection, fileType := restore.getInfoFromFilename(entry.Name())
+
 			switch fileType {
 			case BSONFileType:
 				var skip = mute
